@@ -97,7 +97,7 @@ class Hornsby
   end
   
   def delete_tables
-    ActiveRecord::Base.connection.tables.each { |t| ActiveRecord::Base.connection.delete(@@delete_sql % t)  }
+    tables.each { |t| ActiveRecord::Base.connection.delete(@@delete_sql % t)  }
   end
 
   def tables
