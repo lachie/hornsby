@@ -1,4 +1,3 @@
-require File.dirname(__FILE__)+'/../../../../config/environment'
 require File.dirname(__FILE__)+'/../lib/hornsby'
 
 namespace :hornsby do
