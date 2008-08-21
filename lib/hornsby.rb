@@ -2,13 +2,22 @@ class Hornsby
   @@record_name_fields = %w( name title username login )
   @@delete_sql = "DELETE FROM %s"
   
+  if const_defined?(:RAILS_ROOT)
+    FRAMEWORK_ROOT = RAILS_ROOT
+  elsif const_defined?(:Merb)
+    FRAMEWORK_ROOT = Merb.root
+  end
+  
   cattr_reader :scenarios
   @@scenarios = {}
   # @@namespaces = {}
   
-  def self.build(name)
-    scenario = @@scenarios[name.to_sym] or raise "scenario #{name} not found"
-    scenario.build
+  def self.build(*names)
+    delete_tables
+    
+    scenarios = names.map {|name| @@scenarios[name.to_sym] or raise "scenario #{name} not found"}
+    
+    scenarios.each {|s| s.build}
   end
   
   def self.[](name)
@@ -17,7 +26,7 @@ class Hornsby
   def self.load(scenarios_file=nil)
     return unless @@scenarios.empty?
     
-    scenarios_file ||= RAILS_ROOT+'/spec/hornsby_scenarios.rb'
+    scenarios_file ||= FRAMEWORK_ROOT+'/spec/hornsby_scenarios.rb'
     
     self.module_eval File.read(scenarios_file)
   end
@@ -57,9 +66,19 @@ class Hornsby
 
   def build
     #say "Building scenario `#{@scenario}'"
-    delete_tables
-    
     @context = context = Module.new
+    
+    # TODO move this elsewhere
+    context.module_eval do
+      def self.method_missing(meth_id,*args,&block)
+        begin
+          rec = meth_id.to_s.classify.constantize.send(:create!, *args)
+          yield(rec) if block_given?
+        rescue
+          super
+        end
+      end
+    end
     
     ivars = context.instance_variables
     
@@ -96,15 +115,15 @@ class Hornsby
     raise error
   end
   
-  def delete_tables
+  def self.delete_tables
     tables.each { |t| ActiveRecord::Base.connection.delete(@@delete_sql % t)  }
   end
 
-  def tables
+  def self.tables
     ActiveRecord::Base.connection.tables - skip_tables
   end
 
-  def skip_tables
+  def self.skip_tables
     %w( schema_info )
   end
   
@@ -113,11 +132,17 @@ class Hornsby
       to.instance_variable_set(iv, @context.instance_variable_get(iv))
     end
   end
+  
+  
 end
 
 
 module HornsbySpecHelper
-  def hornsby_scenario(name)
-    Hornsby.build(name).copy_ivars(self)
+  def hornsby_scenario(*names)
+    Hornsby.build(*names).each {|s| s.copy_ivars(self)}
+  end
+  
+  def before
+    puts "hornessbey, before"
   end
 end
